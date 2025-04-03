@@ -7,6 +7,14 @@ TIMEZONE="America/Sao_Paulo"   # Fuso horário
 LOCALE="en_US.UTF-8"           # Idioma
 KEYMAP="br-abnt2"              # Layout do teclado
 
+# --- VERIFICAÇÃO DE VMWARE ---
+if dmesg | grep -qi "vmware"; then
+    VMWARE="YES"
+    echo "VMware detectado, instalando drivers otimizados..."
+else
+    VMWARE="NO"
+fi
+
 # --- VERIFICAÇÃO DE UEFI/BIOS ---
 if [ -d /sys/firmware/efi/efivars ]; then
     BOOT_MODE="UEFI"
@@ -55,9 +63,19 @@ else
     mount "${DISK}1" /mnt
 fi
 
-# --- INSTALAÇÃO DOS PACOTES MÍNIMOS ---
+# --- PACOTES BASE ---
+BASE_PACKAGES="base linux linux-firmware networkmanager sudo"
+
+# --- PACOTES PARA VMWARE ---
+if [ "$VMWARE" = "YES" ]; then
+    VMWARE_PACKAGES="open-vm-tools xf86-video-vmware xf86-input-vmmouse"
+    echo "Pacotes VMware a serem instalados: $VMWARE_PACKAGES"
+    BASE_PACKAGES="$BASE_PACKAGES $VMWARE_PACKAGES"
+fi
+
+# --- INSTALAÇÃO DOS PACOTES ---
 echo "Instalando pacotes básicos..."
-pacstrap -K /mnt base linux linux-firmware networkmanager sudo
+pacstrap -K /mnt $BASE_PACKAGES
 
 # --- GERAR FSTAB ---
 echo "Gerando fstab..."
@@ -97,6 +115,12 @@ echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
 # --- HABILITAR NETWORKMANAGER ---
 systemctl enable NetworkManager
 
+# --- CONFIGURAÇÃO VMWARE (SE NECESSÁRIO) ---
+if [ "$VMWARE" = "YES" ]; then
+    systemctl enable vmtoolsd
+    systemctl enable vmware-vmblock-fuse
+fi
+
 # --- INSTALAR GRUB (UEFI ou BIOS) ---
 if [ "$BOOT_MODE" = "UEFI" ]; then
     pacman -S grub efibootmgr --noconfirm
@@ -112,6 +136,9 @@ EOF
 # --- FINALIZAR ---
 echo "Desmontando e Desligando..."
 umount -R /mnt
+if [ "$VMWARE" = "YES" ]; then
+    echo "VMware Tools instalado com sucesso!"
+fi
 echo "Instalação concluída! Desligando em 5 segundos..."
 sleep 5
 poweroff
