@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # --- CONFIGURAÇÕES (EDITÁVEIS) ---
 DISK="/dev/sda"                # Disco a ser particionado
 HOSTNAME="archlinux"           # Hostname da máquina
@@ -6,6 +8,7 @@ PASSWORD="1234"                # Senha do usuário e root (ALTERE ANTES DE USAR!
 TIMEZONE="America/Sao_Paulo"   # Fuso horário
 LOCALE="en_US.UTF-8"           # Idioma
 KEYMAP="br-abnt2"              # Layout do teclado
+REFLECTOR_COUNTRIES=("Brazil" "United States")  # Países para mirrors
 
 # --- FUNÇÃO DE TRATAMENTO DE ERROS ---
 error_handler() {
@@ -54,6 +57,26 @@ loadkeys "$KEYMAP" || {
     exit 1
 }
 
+# --- ATUALIZAR MIRRORS COM REFLECTOR ---
+echo "Atualizando lista de mirrors com reflector..."
+if ! pacman -Sy reflector --noconfirm; then
+    echo "AVISO: Não foi possível instalar reflector, usando mirrors padrão"
+else
+    # Criar backup do mirrorlist original
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+    
+    # Gerar novo mirrorlist com os melhores mirrors
+    reflector \
+        --latest 20 \
+        --protocol https \
+        --sort rate \
+        --country "${REFLECTOR_COUNTRIES[@]}" \
+        --save /etc/pacman.d/mirrorlist
+    
+    echo "Mirrors atualizados com sucesso!"
+    pacman -Syy  # Atualizar bancos de dados
+fi
+
 # --- PARTICIONAMENTO AUTOMÁTICO (UEFI ou BIOS) ---
 echo "Particionando $DISK..."
 if ! parted -s "$DISK" mklabel gpt; then
@@ -90,7 +113,7 @@ else
 fi
 
 # --- PACOTES BASE ---
-BASE_PACKAGES="base linux linux-firmware networkmanager sudo"
+BASE_PACKAGES="base linux linux-firmware networkmanager sudo reflector"
 
 # --- PACOTES PARA VMWARE ---
 if [ "$VMWARE" = "YES" ]; then
@@ -116,6 +139,17 @@ fi
 # --- CONFIGURAÇÃO DO CHROOT ---
 echo "Configurando sistema instalado..."
 if ! arch-chroot /mnt /bin/bash <<EOF
+# --- ATUALIZAR MIRRORS NO SISTEMA INSTALADO ---
+echo "Configurando mirrors no sistema instalado..."
+reflector \
+    --latest 20 \
+    --protocol https \
+    --sort rate \
+    --country "${REFLECTOR_COUNTRIES[@]}" \
+    --save /etc/pacman.d/mirrorlist
+
+pacman -Syy
+
 # --- RELÓGIO E FUSO HORÁRIO ---
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime || exit 1
 hwclock --systohc || exit 1
