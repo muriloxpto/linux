@@ -8,7 +8,7 @@ PASSWORD="1234"                # Senha do usuário e root (ALTERE ANTES DE USAR!
 TIMEZONE="America/Sao_Paulo"   # Fuso horário
 LOCALE="en_US.UTF-8"           # Idioma
 KEYMAP="br-abnt2"              # Layout do teclado
-REFLECTOR_COUNTRIES=("Brazil" "United States")  # Países para mirrors
+REFLECTOR_COUNTRIES=("Brazil" "United_States")  # Países para mirrors
 
 # --- FUNÇÃO DE TRATAMENTO DE ERROS ---
 error_handler() {
@@ -66,12 +66,13 @@ else
     cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
     
     # Gerar novo mirrorlist com os melhores mirrors
-    reflector \
-        --latest 20 \
-        --protocol https \
-        --sort rate \
-        --country "${REFLECTOR_COUNTRIES[@]}" \
-        --save /etc/pacman.d/mirrorlist
+    reflector_cmd="reflector --latest 20 --protocol https --sort rate"
+    
+    for country in "${REFLECTOR_COUNTRIES[@]}"; do
+        reflector_cmd+=" --country ${country}"
+    done
+    
+    eval "$reflector_cmd --save /etc/pacman.d/mirrorlist"
     
     echo "Mirrors atualizados com sucesso!"
     pacman -Syy  # Atualizar bancos de dados
@@ -140,15 +141,11 @@ fi
 echo "Configurando sistema instalado..."
 if ! arch-chroot /mnt /bin/bash <<EOF
 # --- ATUALIZAR MIRRORS NO SISTEMA INSTALADO ---
-echo "Configurando mirrors no sistema instalado..."
-reflector \
-    --latest 20 \
-    --protocol https \
-    --sort rate \
-    --country "${REFLECTOR_COUNTRIES[@]}" \
-    --save /etc/pacman.d/mirrorlist
-
-pacman -Syy
+reflector_cmd="reflector --latest 20 --protocol https --sort rate"
+for country in "${REFLECTOR_COUNTRIES[@]}"; do
+    reflector_cmd+=" --country ${country}"
+done
+eval "\$reflector_cmd --save /etc/pacman.d/mirrorlist"
 
 # --- RELÓGIO E FUSO HORÁRIO ---
 ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime || exit 1
