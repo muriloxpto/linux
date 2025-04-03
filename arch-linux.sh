@@ -9,7 +9,7 @@ HOSTNAME="archlinux"
 USERNAME="murilo"
 PASSWORD="1234"
 TIMEZONE="America/Sao_Paulo"
-KEYMAP="bt-abnt2"                # Mapa de teclado padrão (altere se necessário)
+KEYMAP="br-abnt2"                # Mapa de teclado padrão (altere se necessário)
 
 # --- Particionamento ---
 # Limpa a tabela de partições e cria nova tabela GPT

@@ -1,3 +1,4 @@
-curl -L -o arch-linux.sh https://raw.githubusercontent.com/muriloxpto/linux/refs/heads/main/arch-linux.sh
+loadkeys br-abnt2
+curl -L -o arch-linux.sh https://tinyurl.com/3mpmvhcw
 chmod +x arch-linux.sh
 ./arch-linux.sh
