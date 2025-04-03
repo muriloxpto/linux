@@ -1,0 +1,3 @@
+curl -L -o arch-linux.sh https://raw.githubusercontent.com/muriloxpto/linux/refs/heads/main/arch-linux.sh
+chmod +x arch-linux.sh
+./arch-linux.sh
