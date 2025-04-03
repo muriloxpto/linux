@@ -1,84 +1,90 @@
-#!/bin/bash
+# --- CONFIGURAÇÕES (EDITÁVEIS) ---
+DISK="/dev/sda"                # Disco a ser particionado
+HOSTNAME="archlinux"           # Hostname da máquina
+USER="user"                    # Nome do usuário padrão
+PASSWORD="1234"                # Senha do usuário e root (ALTERE ANTES DE USAR!)
+TIMEZONE="America/Sao_Paulo"   # Fuso horário
+LOCALE="en_US.UTF-8"     # Idioma
+KEYMAP="br-abnt2"              # Layout do teclado
 
-# --- Variáveis de Configuração ---
-DISK="/dev/sda"
-ESP_PARTITION="${DISK}1"   # Partição EFI (512MB)
-ROOT_PARTITION="${DISK}2"  # Restante do disco
-MOUNT_POINT="/mnt"
-HOSTNAME="archlinux"
-USERNAME="murilo"
-PASSWORD="1234"
-TIMEZONE="America/Sao_Paulo"
-KEYMAP="br-abnt2"                # Mapa de teclado padrão (altere se necessário)
+# --- VERIFICAÇÃO DE INTERNET ---
+echo "Verificando conexão com a internet..."
+if ! ping -c 3 archlinux.org &> /dev/null; then
+    echo "ERRO: Sem internet! Configure manualmente e tente novamente."
+    exit 1
+fi
 
-# --- Particionamento ---
-# Limpa a tabela de partições e cria nova tabela GPT
-wipefs -a "$DISK"
+# --- CONFIGURAR TECLADO ---
+loadkeys "$KEYMAP"
+
+# --- PARTICIONAMENTO AUTOMÁTICO (UEFI) ---
+echo "Particionando $DISK..."
 parted -s "$DISK" mklabel gpt
-
-# Cria partição EFI (FAT32, 512MB)
-parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+parted -s "$DISK" mkpart primary fat32 1MiB 512MiB
 parted -s "$DISK" set 1 esp on
+parted -s "$DISK" mkpart primary ext4 512MiB 100%
 
-# Cria partição raiz (ext4, resto do disco)
-parted -s "$DISK" mkpart primary ext4 513MiB 100%
+# --- FORMATAÇÃO ---
+echo "Formatando partições..."
+mkfs.fat -F32 "${DISK}1"
+mkfs.ext4 -F "${DISK}2"
 
-# Formata as partições
-mkfs.fat -F32 "$ESP_PARTITION"
-mkfs.ext4 -F "$ROOT_PARTITION"  # -F para forçar formatação rápida
+# --- MONTAGEM ---
+mount "${DISK}2" /mnt
+mkdir -p /mnt/boot/efi
+mount "${DISK}1" /mnt/boot/efi
 
-# Monta as partições
-mount "$ROOT_PARTITION" "$MOUNT_POINT"
-mkdir -p "$MOUNT_POINT/boot"
-mount "$ESP_PARTITION" "$MOUNT_POINT/boot"
+# --- INSTALAÇÃO DOS PACOTES MÍNIMOS ---
+echo "Instalando pacotes básicos..."
+pacstrap -K /mnt base linux linux-firmware networkmanager sudo
 
-# --- Instalação Mínima ---
-# Pacotes essenciais apenas (removido linux-firmware que pode ser instalado depois se necessário)
-pacstrap "$MOUNT_POINT" base linux base-devel
+# --- GERAR FSTAB ---
+echo "Gerando fstab..."
+genfstab -U /mnt >> /mnt/etc/fstab
 
-# --- Configuração do Sistema ---
-# Gera fstab com UUIDs para maior confiabilidade
-genfstab -U "$MOUNT_POINT" >> "$MOUNT_POINT/etc/fstab"
+# --- CONFIGURAÇÃO DO CHROOT ---
+echo "Configurando sistema instalado..."
+arch-chroot /mnt /bin/bash <<EOF
+# --- RELÓGIO E FUSO HORÁRIO ---
+ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+hwclock --systohc
 
-# Configuração via chroot
-arch-chroot "$MOUNT_POINT" /bin/bash <<EOF
-    # Configuração básica do sistema
-    echo "$HOSTNAME" > /etc/hostname
-    ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
-    hwclock --systohc --utc
-    
-    # Locale mínimo (apenas en_US.UTF-8)
-    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
-    locale-gen
-    echo "LANG=en_US.UTF-8" > /etc/locale.conf
-    echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
-    echo "FONT=lat9w-16" >> /etc/vconsole.conf  # Fonte com suporte a acentos
-    
-    # Rede básica (systemd-networkd + systemd-resolved)
-    systemctl enable systemd-networkd systemd-resolved
-    
-    # Initramfs mínimo
-    mkinitcpio -P
-    
-    # Bootloader (GRUB mínimo)
-    pacman -S --noconfirm --needed grub efibootmgr
-    grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --removable
-    grub-mkconfig -o /boot/grub/grub.cfg
-    
-    # Usuário e senha
-    useradd -m -G wheel "$USERNAME"
-    echo "$USERNAME:$PASSWORD" | chpasswd
-    
-    # Sudo simplificado (sem instalar o pacote sudo, usando do su)
-    echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
-    echo "Defaults !tty_tickets" >> /etc/sudoers  # Mantém sudo válido por mais tempo
-    
-    # Otimização: limpar cache pacman
-    pacman -Scc --noconfirm
+# --- LOCALE (IDIOMA) ---
+echo "$LOCALE UTF-8" >> /etc/locale.gen
+locale-gen
+echo "LANG=$LOCALE" > /etc/locale.conf
+
+# --- TECLADO ---
+echo "KEYMAP=$KEYMAP" > /etc/vconsole.conf
+
+# --- HOSTNAME ---
+echo "$HOSTNAME" > /etc/hostname
+
+# --- HOSTS ---
+echo "127.0.0.1 localhost" >> /etc/hosts
+echo "::1 localhost" >> /etc/hosts
+echo "127.0.1.1 $HOSTNAME.localdomain $HOSTNAME" >> /etc/hosts
+
+# --- SENHAS (ROOT E USUÁRIO) ---
+echo "root:$PASSWORD" | chpasswd
+useradd -m -G wheel -s /bin/bash "$USER"
+echo "$USER:$PASSWORD" | chpasswd
+
+# --- SUDOERS ---
+echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+
+# --- HABILITAR NETWORKMANAGER ---
+systemctl enable NetworkManager
+
+# --- INSTALAR GRUB (UEFI) ---
+pacman -S grub efibootmgr --noconfirm
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
+grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 
-# --- Finalização ---
-umount -R "$MOUNT_POINT"
-echo "Instalação mínima concluída! Reiniciando em 5 segundos..."
+# --- FINALIZAR ---
+echo "Desmontando e reiniciando..."
+umount -R /mnt
+echo "Instalação concluída! Reiniciando em 5 segundos..."
 sleep 5
 reboot
