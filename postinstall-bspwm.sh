@@ -66,28 +66,28 @@ sudo -u "$USER" chmod +x "$USER_HOME/.config/bspwm/bspwmrc"
 # Configurar sessão padrão
 echo "Configurando sessão automática..."
 mkdir -p /var/lib/AccountsService/users/
-cat > "/var/lib/AccountsService/users/$USER" <<EOF
+cat > "/var/lib/AccountsService/users/$USER" <<"INNER_EOF"
 [User]
 Language=
 Session=bspwm
 XSession=bspwm
-Icon=$USER_HOME/.face
-EOF
+Icon=/home/$USER/.face
+INNER_EOF
 
 # Configurar .xinitrc
-sudo -u "$USER" echo "exec bspwm" > "$USER_HOME/.xinitrc"
+sudo -u "$USER" bash -c 'echo "exec bspwm" > "$HOME/.xinitrc"'
 
 # Criar entrada de sessão para o lightdm
-cat > /usr/share/xsessions/bspwm.desktop <<EOF
+cat > /usr/share/xsessions/bspwm.desktop <<"INNER_EOF"
 [Desktop Entry]
 Name=bspwm
 Comment=Binary space partitioning window manager
 Exec=bspwm
 Type=Application
-EOF
+INNER_EOF
 
 # Mensagem final
-cat <<EOF
+cat <<"INNER_EOF"
 
 Instalação do BSPWM concluída com sucesso!
 
@@ -98,7 +98,7 @@ Configurações:
 - Atalhos em: $USER_HOME/.config/sxhkd/sxhkdrc
 
 Após reiniciar, o sistema iniciará automaticamente no BSPWM.
-EOF
+INNER_EOF
 
 CHROOT_EOF
 
