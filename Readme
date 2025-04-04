@@ -2,3 +2,7 @@ loadkeys br-abnt2
 curl -L -o arch-linux.sh https://tinyurl.com/3mpmvhcw
 chmod +x arch-linux.sh
 ./arch-linux.sh
+
+pacman -Syu
+pacman -S git
+git clone https://github.com/muriloxpto/linux
