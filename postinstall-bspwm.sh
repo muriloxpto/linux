@@ -101,7 +101,7 @@ Após reiniciar, o sistema iniciará automaticamente no BSPWM.
 EOF
 
 CHROOT_EOF
-
+fi
 # Verificar se a instalação foi bem sucedida
 if [ $? -eq 0 ]; then
     echo "Instalação concluída com sucesso!"
