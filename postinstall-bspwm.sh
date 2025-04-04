@@ -3,7 +3,8 @@
 # Script para instalação do BSPWM em ambiente chroot pós-instalação do Arch Linux
 
 # Verificar se estamos no ambiente chroot
-if ! arch-chroot /mnt /bin/bash <<"CHROOT_EOF"; then
+if ! arch-chroot /mnt /bin/bash <<"CHROOT_EOF"
+then
     echo "ERRO: Falha ao entrar no ambiente chroot"
     exit 1
 fi
